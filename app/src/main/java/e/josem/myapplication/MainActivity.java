@@ -1,16 +1,24 @@
 package e.josem.myapplication;
 
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.AsyncTask;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.widget.GridView;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.concurrent.ExecutionException;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -19,17 +27,69 @@ public class MainActivity extends AppCompatActivity {
     String[] src = new String[20];
     String[] stars = new String[20];
     String[] metaScores = new String[20];
+    GridView gridView;
+    ArrayList<MovieItem> movies=new ArrayList<>();
+    Bitmap bitmap;
+
+
+    public void loadMovies(){
+
+        for(int i = 0; i < src.length; i++) {
+
+            try {
+                ImageDownloadTask imageDownloadTask = new ImageDownloadTask();
+                Log.i("loadMovies","loading "+src[i]);
+
+                bitmap = imageDownloadTask.execute(src[i]).get();
+                MovieItem movieItem = new MovieItem(titles[i],stars[i],metaScores[i],bitmap);
+                movies.add(movieItem);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } catch (ExecutionException e) {
+                e.printStackTrace();
+            }
+
+        }
+    }
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
+        gridView = findViewById(R.id.gridMovies);
         DownloadTask downloadTask = new DownloadTask();
-        downloadTask.execute("http://www.imdb.com/list/ls064079588/");
+        try {
+            downloadTask.execute("http://www.imdb.com/list/ls064079588/").get();
 
+            MovieAdapter movieAdapter=new MovieAdapter(this,R.layout.grid_view_items,movies);
+            gridView.setAdapter(movieAdapter);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } catch (ExecutionException e) {
+            e.printStackTrace();
+        }
 
     }
+    class ImageDownloadTask extends AsyncTask<String,Void,Bitmap>{
 
+        @Override
+        protected Bitmap doInBackground(String... urls) {
+            try {
+                URL url = new URL(urls[0]);
+                HttpURLConnection httpURLConnection =(HttpURLConnection)url.openConnection();
+
+                httpURLConnection.connect();
+                InputStream inputStream = httpURLConnection.getInputStream();
+                bitmap = BitmapFactory.decodeStream(inputStream);
+                return bitmap;
+
+            } catch (MalformedURLException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            return null;
+        }
+    }
     class DownloadTask extends AsyncTask<String, String, String> {
 
 
@@ -38,8 +98,6 @@ public class MainActivity extends AppCompatActivity {
 
             try {
                 document = Jsoup.connect(url[0]).get();
-                Log.d("download task","mensaje");
-                Log.d("html",document.getAllElements().toString());
             } catch (IOException e) {
                 e.printStackTrace();
             }
@@ -60,8 +118,14 @@ public class MainActivity extends AppCompatActivity {
                 src[i] = moviesImage.get(i).attr("loadlate");
                 stars[i] = movieStars.get(i).text();
                 metaScores[i] = movieMetaScore.get(i).text();
-
+//                MovieItem movieItem = new MovieItem(titles[i],stars[i],metaScores[i],R.drawable.placeholder);
+//                movies.add(movieItem);
             }
+//            MovieAdapter movieAdapter=new MovieAdapter(getApplicationContext(),R.layout.grid_view_items,movies);
+//            gridView.setAdapter(movieAdapter);
+//            gridView.invalidate();
+//            movies.clear();
+            loadMovies();
         }
 
     }
